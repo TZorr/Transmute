@@ -65,7 +65,12 @@ Building it yourself works as well - see [Building](#building).
    **Reset All** (Drum › Reset All…) goes back to Transmute as it opens -
    pads empty, pan, notes and models at their defaults, pad 1 selected,
    the batch list empty - after asking; Settings, the export boxes and
-   learnt CCs stay, as over a restart. WAV, AIFF, CAF, FLAC, ALAC, AAC/M4A and MP3
+   learnt CCs stay, as over a restart.
+   **Dragging a pad onto another swaps them**: drum, pan and model choice
+   change places - a fit still running goes along - while the MIDI notes
+   stay where they are, so pad 1 still answers to C1 (Kitbox's rule). The
+   selection follows the dragged pad. Dragging a drum onto an empty pad
+   moves it there. WAV, AIFF, CAF, FLAC, ALAC, AAC/M4A and MP3
    all work, up to 10 seconds. Stereo is folded to mono by averaging.
    Silence or noise before the hit is trimmed off.
 2. **Analysis and fit start on their own.** The measured first guess is

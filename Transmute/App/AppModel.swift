@@ -50,7 +50,8 @@ enum LearnRequest: Equatable {
 
 @Observable
 final class AppModel {
-    let pads: [PadModel]
+    /// In place order; swapPads reorders them.
+    private(set) var pads: [PadModel]
     var selected = 0 {
         didSet {
             guard selected != oldValue else { return }
@@ -213,6 +214,24 @@ final class AppModel {
             self.selectPad(offset: event.modifierFlags.contains(.shift) ? -1 : 1)
             return nil
         }
+    }
+
+    /// The pad at `from` dragged onto the one at `to` - the author's request,
+    /// 2026-10-03: the two change places, drum, pan and model choice with
+    /// them. The MIDI note stays with the place, as in Kitbox: pad 1 still
+    /// answers to C1, whatever drum is on it now. The selection follows the
+    /// dragged pad. Fits still running go along (see PadModel.moved).
+    func swapPads(_ from: Int, _ to: Int) {
+        guard from != to, pads.indices.contains(from), pads.indices.contains(to) else { return }
+        let moving = pads[from], other = pads[to]
+        (moving.note, other.note) = (other.note, moving.note)
+        pads.swapAt(from, to)
+        moving.moved(to: to)
+        other.moved(to: from)
+        selected = to
+        player.setOriginal(pad.original)
+        player.setSynth(pad.synth)
+        message = "Swapped pads \(from + 1) and \(to + 1)"
     }
 
     /// A click on a pad: select it and play it.

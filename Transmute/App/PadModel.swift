@@ -31,6 +31,11 @@
 //  one is still being fitted bumps it, and whatever arrives with an older
 //  number is thrown away.
 //
+//  A pad can change places: dragging one pad onto another swaps the two
+//  objects in AppModel.pads (`moved(to:)` gives each its new index). Every
+//  job holds its pad, not a number, so a fit that ends after the move lands
+//  on the drum's new place.
+//
 
 import Foundation
 import Observation
@@ -56,7 +61,9 @@ enum Stage: Equatable {
 
 @Observable
 final class PadModel {
-    let index: Int
+    /// The pad's place, 0-15; changes when pads are swapped (AppModel
+    /// .swapPads).
+    private(set) var index: Int
     @ObservationIgnored weak var app: AppModel?
 
     private(set) var url: URL?
@@ -103,6 +110,8 @@ final class PadModel {
     @ObservationIgnored private var task: Task<Void, Never>?
     @ObservationIgnored private var comparison: Comparison?
     @ObservationIgnored private var voiceTask: Task<Void, Never>?
+    /// The playable copy last handed to the kit player.
+    @ObservationIgnored private var voiceSet: PadVoiceSet?
 
     init(index: Int) {
         self.index = index
@@ -323,6 +332,7 @@ final class PadModel {
     private func scheduleVoices() {
         voiceTask?.cancel()
         guard hasSynth else {
+            voiceSet = nil
             app?.kit.setPad(index, nil)
             return
         }
@@ -334,8 +344,19 @@ final class PadModel {
                 PadVoiceSet.make(params: params, pan: pan)
             }.value
             guard !Task.isCancelled else { return }
+            self?.voiceSet = set
             self?.app?.kit.setPad(index, set)
         }
+    }
+
+    /// Now at place `newIndex` (a swap, AppModel.swapPads). The kit player
+    /// gets the playable copy there at once - a click right after the drop
+    /// plays this drum, not the one that left - and a copy still being
+    /// built, which was headed for the old place, is built again.
+    func moved(to newIndex: Int) {
+        index = newIndex
+        app?.kit.setPad(newIndex, hasSynth ? voiceSet : nil)
+        scheduleVoices()
     }
 
     /// The synth's peak in dBFS, before export.
