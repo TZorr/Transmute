@@ -55,6 +55,9 @@ struct TransmuteApp: App {
                 Button("Export Kit…") { model.exportKit() }
                     .keyboardShortcut("e", modifiers: [.command, .option])
                     .disabled(!model.canExportKit)
+                Button("Export Kitbox Kit…") { model.exportKitboxKit() }
+                    .keyboardShortcut("e", modifiers: [.command, .option, .shift])
+                    .disabled(!model.canExportKit)
                 Divider()
                 BatchMenuItem()
             }
@@ -88,6 +91,7 @@ struct TransmuteApp: App {
                     .disabled(model.pad.isEmpty)
                 Button("Clear All Pads") { model.clearAllPads() }
                     .disabled(!model.hasAnyDrum)
+                Button("Reset All…") { model.resetAll() }
                 Divider()
                 Button("Limit Peaks to \(model.maxLevelLabel)") { model.limitPeaks() }
                     .keyboardShortcut("l", modifiers: [.command, .option])

@@ -3,7 +3,7 @@
 //  Transmute
 //
 //  The Batch Convert window (File › Batch Convert…): the settings for the
-//  whole batch on top - model, prefix, format and depth, max level - the
+//  whole batch on top - model, renaming, format and depth, max level - the
 //  files below, each with the name it will be written as and how far it
 //  got. The whole list is the drop target, empty or not. Where the files
 //  go is asked when Convert is pressed (BatchModel.askForFolder).
@@ -54,11 +54,12 @@ struct BatchView: View {
                     .fixedSize()
                     .help("The voice every file is rebuilt with. Automatic lets each sample's analysis choose; a model chosen here analyses and fits every file as that drum - Clap: all of them as claps.")
                     HStack(spacing: 6) {
-                        Text("Prefix")
+                        Toggle("Rename", isOn: $batch.rename)
                         TextField(BatchConvert.defaultPrefix, text: $batch.prefix)
                             .frame(width: 200)
+                            .disabled(!batch.rename)
                     }
-                    .help("Files are named \"<prefix> <number>\", numbered in the list's order - by name, as the Finder sorts.")
+                    .help("Off: every file keeps its own name. On: files are named \"<prefix> <number>\", numbered in the list's order - by name, as the Finder sorts.")
                 }
                 .disabled(batch.running)
             }
@@ -116,9 +117,10 @@ struct BatchView: View {
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
+                let names = batch.fileNames
                 List {
                     ForEach(Array(batch.items.enumerated()), id: \.element.id) { position, item in
-                        row(item, position: position)
+                        row(item, position: position, name: names[position])
                             .contextMenu {
                                 Button("Remove from List") { batch.remove(item.id) }
                                     .disabled(batch.running)
@@ -138,14 +140,14 @@ struct BatchView: View {
         } isTargeted: { targeted = $0 && !batch.running }
     }
 
-    private func row(_ item: BatchModel.Item, position: Int) -> some View {
+    private func row(_ item: BatchModel.Item, position: Int, name: String) -> some View {
         HStack(spacing: 10) {
             Text("\(position + 1)")
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
                 .frame(width: 28, alignment: .trailing)
             VStack(alignment: .leading, spacing: 1) {
-                Text(batch.fileName(at: position)).lineLimit(1)
+                Text(name).lineLimit(1)
                 Text(item.url.lastPathComponent)
                     .font(.caption)
                     .foregroundStyle(.secondary)

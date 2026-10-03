@@ -14,10 +14,13 @@
 //  depth. Optionally the peak is first brought down to the max
 //  level (LevelLimit).
 //
-//  Names, as Export Kit's: "<prefix> <number>", the number the file's
-//  place in the list, which is sorted by name the way the pads' Multi
-//  drop is - so "Clap 1" is always the first clap by name, and converting
-//  the same list again replaces the same files.
+//  Names, as Export Kit's: by default each file keeps its source's name
+//  ("808 CLAP.aif" becomes "808 CLAP.wav"; the same name from two folders
+//  gets " 2" on the second - the author's call, 2026-10-03). Renamed, it is
+//  "<prefix> <number>", the number the file's place in the list, which is
+//  sorted by name the way the pads' Multi drop is - so "Clap 1" is always
+//  the first clap by name, and converting the same list again replaces the
+//  same files.
 //
 //  A dropped folder brings its audio files, subfolders included.
 //
@@ -84,6 +87,14 @@ nonisolated enum BatchConvert {
     /// "<prefix> <position + 1>.<extension>" - Export Kit's names.
     static func fileName(prefix: String, position: Int, fileExtension: String) -> String {
         KitExport.fileName(prefix: prefix, index: position, fileExtension: fileExtension)
+    }
+
+    /// The name each of `sources` is written as: its own (`.original`) or
+    /// "<prefix> <position + 1>" - Export Kit's rules, the list's place for
+    /// the pad's number.
+    static func fileNames(for sources: [URL], naming: KitExport.Naming, fileExtension: String) -> [String] {
+        KitExport.fileNames(for: sources.enumerated().map { ($0.offset, $0.element.deletingPathExtension().lastPathComponent) },
+                            naming: naming, fileExtension: fileExtension)
     }
 
     /// Converts `source` into `destination`: decode, analyse (as `model`, or

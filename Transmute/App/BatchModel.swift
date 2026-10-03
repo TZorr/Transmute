@@ -3,9 +3,9 @@
 //  Transmute
 //
 //  The Batch Convert window's state: the dropped files, sorted by name,
-//  the model for all of them, the prefix and whether to hold peaks to the
-//  max level (see BatchConvert for what one file
-//  goes through).
+//  the model for all of them, whether to rename them (with which prefix) -
+//  by default each keeps its own name - and whether to hold peaks to the
+//  max level (see BatchConvert for what one file goes through).
 //
 //  The fits go through the app's fit queue with the pads' (AppModel
 //  .enqueueFit), so a batch uses every core but two and a sample dropped
@@ -61,6 +61,11 @@ final class BatchModel {
         didSet { UserDefaults.standard.set(prefix, forKey: Self.prefixKey) }
     }
 
+    /// Files renamed "<prefix> <number>"; off: each keeps its own name.
+    var rename: Bool {
+        didSet { UserDefaults.standard.set(rename, forKey: Self.renameKey) }
+    }
+
     var limitToMax: Bool {
         didSet { UserDefaults.standard.set(limitToMax, forKey: Self.limitKey) }
     }
@@ -72,6 +77,7 @@ final class BatchModel {
 
     private static let modelKey = "batchModel"
     private static let prefixKey = "batchPrefix"
+    private static let renameKey = "batchRename"
     private static let limitKey = "batchLimitToMax"
     private static let folderKey = "batchFolder"
 
@@ -80,6 +86,7 @@ final class BatchModel {
         let defaults = UserDefaults.standard
         modelChoice = defaults.string(forKey: Self.modelKey).flatMap(DrumModel.init(rawValue:))
         prefix = defaults.string(forKey: Self.prefixKey) ?? BatchConvert.defaultPrefix
+        rename = defaults.bool(forKey: Self.renameKey)
         limitToMax = defaults.object(forKey: Self.limitKey) as? Bool ?? true
         folder = Self.resolveFolder()
     }
@@ -128,9 +135,10 @@ final class BatchModel {
         message = nil
     }
 
-    /// The name position `position` in the list is written as.
-    func fileName(at position: Int) -> String {
-        BatchConvert.fileName(prefix: prefix, position: position, fileExtension: app?.exportFormat.fileExtension ?? "wav")
+    /// The names the list is written as, in its order.
+    var fileNames: [String] {
+        BatchConvert.fileNames(for: items.map(\.url), naming: rename ? .numbered(prefix: prefix) : .original,
+                               fileExtension: app?.exportFormat.fileExtension ?? "wav")
     }
 
     // MARK: - Folder
@@ -182,15 +190,23 @@ final class BatchModel {
         let format = app.exportFormat, quality = app.exportQuality
         let maxDB = limitToMax ? app.maxLevelDB : nil
         let model = modelChoice
-        let targets = items.indices.map { folder.appendingPathComponent(fileName(at: $0)) }
+        let targets = fileNames.map { folder.appendingPathComponent($0) }
 
         let scoped = folder.startAccessingSecurityScopedResource()
         let existing = targets.filter { FileManager.default.fileExists(atPath: $0.path) }
         if !existing.isEmpty {
+            // With their own names, converting into the samples' folder in
+            // their format would write over the samples themselves.
+            let sources = Set(items.map { $0.url.standardizedFileURL.path })
+            let originals = existing.filter { sources.contains($0.standardizedFileURL.path) }.count
             let alert = NSAlert()
             alert.messageText = existing.count == 1 ? "Replace \(existing[0].lastPathComponent)?"
                                                     : "Replace \(existing.count) files in \(folder.lastPathComponent)?"
-            alert.informativeText = existing.prefix(20).map(\.lastPathComponent).joined(separator: "\n")
+            alert.informativeText = (originals > 0
+                    ? (originals == 1 ? "One of them is a sample being converted - it would be overwritten by its synth.\n\n"
+                                      : "\(originals) of them are samples being converted - they would be overwritten by their synths.\n\n")
+                    : "")
+                + existing.prefix(20).map(\.lastPathComponent).joined(separator: "\n")
                 + (existing.count > 20 ? "\n…" : "")
             alert.addButton(withTitle: "Replace")
             alert.addButton(withTitle: "Cancel")

@@ -126,55 +126,84 @@ struct ContentView: View {
         }
     }
 
+    /// Two rows since Reset All and the Kitbox export joined (2026-10-03):
+    /// in one, SwiftUI truncated the titles ("Ori…", "Limit to -…") at the
+    /// window's usual widths. The first row acts on the pads - listen, fit,
+    /// clear, limit - with the selected pad's peak; the second writes files,
+    /// with the last outcome beside it. Buttons keep their full titles
+    /// (fixedSize); only the message gives way.
     private var bottomBar: some View {
-        HStack(spacing: 10) {
-            Button {
-                model.player.play(.original)
-            } label: {
-                Label("Original", systemImage: "play.fill")
+        VStack(spacing: 10) {
+            HStack(spacing: 10) {
+                Button {
+                    model.player.play(.original)
+                } label: {
+                    Label("Original", systemImage: "play.fill")
+                }
+                .disabled(model.pad.original == nil)
+                .help("Play the original hit (⌘1)")
+
+                Button {
+                    model.player.play(.synth)
+                } label: {
+                    Label("Synth", systemImage: "play.fill")
+                }
+                .disabled(!model.pad.hasSynth)
+                .help("Play the synth (⌘2); Space plays the last one again")
+
+                Divider().frame(height: 18)
+
+                Button("Fit Again") { model.pad.refit() }
+                    .disabled(!model.pad.canFit)
+                    .help("Fit from the parameters as they are now (⌘R)")
+                Button("Reset") { model.pad.resetToFit() }
+                    .disabled(!model.pad.canReset)
+                    .help("Back to what the last fit found (⇧⌘R)")
+
+                Divider().frame(height: 18)
+
+                Button("Clear") { model.clearAllPads() }
+                    .disabled(!model.hasAnyDrum)
+                    .help("Empty all sixteen pads. Their pan, notes and model choice stay.")
+                Button("Reset All") { model.resetAll() }
+                    .help("Everything back to how Transmute opens: all pads empty, pan, notes and models at their defaults. Asks first.")
+                Button("Limit to \(model.maxLevelLabel)") { model.limitPeaks() }
+                    .disabled(!model.hasAnyDrum)
+                    .help("Every pad whose peak is above \(model.maxLevelLabel) gets its Level lowered until the peak is there - pads still fitting as soon as they are done; pads under it stay as they are. The max level is set in Settings (⌥⌘L).")
+
+                Spacer(minLength: 0)
+
+                peak
             }
-            .disabled(model.pad.original == nil)
-            .help("Play the original hit (⌘1)")
+            .fixedSize(horizontal: false, vertical: true)
 
-            Button {
-                model.player.play(.synth)
-            } label: {
-                Label("Synth", systemImage: "play.fill")
+            HStack(spacing: 10) {
+                if let message = model.message {
+                    Text(message)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                Spacer(minLength: 0)
+                HStack(spacing: 10) {
+                    Button("Batch Convert…") { openWindow(id: BatchMenuItem.windowID) }
+                        .help("Open the Batch Convert window: many samples fitted and written as files in one go (⇧⌘B)")
+                    // One control for both kit exports: a click writes the
+                    // files, the arrow offers the Kitbox preset.
+                    Menu("Export Kit…") {
+                        Button("Export Kit…") { model.exportKit() }
+                        Button("Export Kitbox Kit…") { model.exportKitboxKit() }
+                    } primaryAction: {
+                        model.exportKit()
+                    }
+                    .menuStyle(.button)
+                    .disabled(!model.canExportKit)
+                    .help("Every pad with a drum as a file named after its sample - or renamed \"<prefix> <pad number>\" - in the format and depth beside it (⌥⌘E). The arrow: the kit as one Kitbox preset, with pan and notes (⇧⌥⌘E).")
+                    ExportBoxes(model: model)
+                }
+                .fixedSize()
             }
-            .disabled(!model.pad.hasSynth)
-            .help("Play the synth (⌘2); Space plays the last one again")
-
-            Divider().frame(height: 18)
-
-            Button("Fit Again") { model.pad.refit() }
-                .disabled(!model.pad.canFit)
-                .help("Fit from the parameters as they are now (⌘R)")
-            Button("Reset") { model.pad.resetToFit() }
-                .disabled(!model.pad.canReset)
-                .help("Back to what the last fit found (⇧⌘R)")
-            Button("Clear") { model.clearAllPads() }
-                .disabled(!model.hasAnyDrum)
-                .help("Empty all sixteen pads. Their pan, notes and model choice stay.")
-            Button("Limit to \(model.maxLevelLabel)") { model.limitPeaks() }
-                .disabled(!model.hasAnyDrum)
-                .help("Every pad whose peak is above \(model.maxLevelLabel) gets its Level lowered until the peak is there; pads under it stay as they are. The max level is set in Settings (⌥⌘L).")
-
-            Spacer()
-
-            if let message = model.message {
-                Text(message)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
-            peak
-            Button("Batch Convert…") { openWindow(id: BatchMenuItem.windowID) }
-                .help("Open the Batch Convert window: many samples fitted and written as files in one go (⇧⌘B)")
-            Button("Export Kit…") { model.exportKit() }
-                .disabled(!model.canExportKit)
-                .help("Every pad with a drum as \"<prefix> <pad number>\", in the format and depth beside it (⌥⌘E)")
-            ExportBoxes(model: model)
         }
     }
 
@@ -189,6 +218,7 @@ struct ContentView: View {
                 .foregroundStyle(clips ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
                 .help(clips ? "Above 0 dBFS: a 32-bit float export keeps it, 16- and 24-bit ones clip. Lower Level to fix it."
                             : "The synth's highest sample")
+                .fixedSize()
         }
     }
 }

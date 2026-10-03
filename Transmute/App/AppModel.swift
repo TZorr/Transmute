@@ -33,7 +33,8 @@
 //  Dropping: pad 1 "Multi" takes up to sixteen files, by name, onto pads
 //  1-16 without asking; every other pad one file (DrumKit.dropTargets).
 //  Clear empties all sixteen pads' drums and keeps what belongs to the pads'
-//  places - pan, note, model choice (PadModel.clear).
+//  places - pan, note, model choice (PadModel.clear). Reset All goes further,
+//  back to the window as it opens (`resetAll`).
 //
 
 import Foundation
@@ -112,6 +113,28 @@ final class AppModel {
         message = "Cleared all pads"
     }
 
+    /// Everything back to how Transmute opens - the author's request,
+    /// 2026-10-03: every pad empty with its default pan, note and model
+    /// (Automatic), pad 1 selected, no kit name, Learn off, the batch list
+    /// empty. What is kept on this Mac anyway - Settings, the export boxes,
+    /// prefixes, learnt CCs - stays, as it would over a restart. Asks
+    /// first: the fits are gone with it.
+    func resetAll() {
+        let alert = NSAlert()
+        alert.messageText = "Reset everything?"
+        alert.informativeText = "All sixteen pads are emptied, and their pan, notes and models go back to the defaults - Transmute as it opens. Settings and learnt MIDI controls stay."
+        alert.addButton(withTitle: "Reset All")
+        alert.addButton(withTitle: "Cancel")
+        alert.alertStyle = .warning
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        newKit()
+        selected = 0
+        player.setOriginal(nil)
+        player.setSynth(nil)
+        learning = nil
+        batch.removeAll()
+    }
+
     // MARK: - Max level
 
     /// The ceiling for peaks (Settings), on the 0.5 dB grid; remembered on
@@ -136,20 +159,32 @@ final class AppModel {
 
     /// Every pad whose peak is above the max level gets its Level lowered
     /// by exactly the overshoot (LevelLimit); the rest stay. A pad still
-    /// fitting is left out - the fit's result would replace the change.
-    /// No report of which pads moved: the Peak readout shows the result
-    /// (the author's call, 2026-09-26). Only skipped pads are mentioned, since
-    /// nothing else would show them.
+    /// loading or fitting is marked instead and limited when its fit is
+    /// done (PadModel.limitPending) - limited now, the fit's result would
+    /// replace the change; skipped, as until 2026-10-03, one click did not
+    /// reach all sixteen pads. No report of which pads moved: the Peak
+    /// readout shows the result (the author's call, 2026-09-26). Only the
+    /// waiting pads are mentioned, since nothing else would show them.
     func limitPeaks() {
-        var fitting = 0
-        for pad in pads where pad.hasSynth {
-            if pad.stage.busy { fitting += 1; continue }
-            if let limited = LevelLimit.limited(pad.params, maxDB: maxLevelDB,
-                                                rates: [MonoAudio.analysisRate, pad.exportRate]) {
-                pad.params = limited
+        var waiting = 0
+        for pad in pads {
+            if pad.stage.busy {
+                pad.limitPending = true
+                waiting += 1
+            } else if pad.hasSynth {
+                limit(pad)
             }
         }
-        message = fitting > 0 ? "\(fitting) pad\(fitting == 1 ? "" : "s") still fitting, left as \(fitting == 1 ? "it is" : "they are")" : nil
+        message = waiting > 0 ? "\(waiting) pad\(waiting == 1 ? "" : "s") still fitting - limited when done" : nil
+    }
+
+    /// One pad's peak held to the max level, now.
+    func limit(_ pad: PadModel) {
+        guard pad.hasSynth else { return }
+        if let limited = LevelLimit.limited(pad.params, maxDB: maxLevelDB,
+                                            rates: [MonoAudio.analysisRate, pad.exportRate]) {
+            pad.params = limited
+        }
     }
 
     /// Tab and Shift-Tab: the next or the previous pad, round from 8 to 1.
@@ -404,107 +439,190 @@ final class AppModel {
 
     // MARK: - Export Kit
 
-    /// The prefix the last kit export used, remembered on this Mac.
+    /// The prefix the last renamed kit export used, remembered on this Mac.
     var kitExportPrefix: String {
         get { UserDefaults.standard.string(forKey: Self.prefixKey) ?? kitName ?? KitExport.defaultPrefix }
         set { UserDefaults.standard.set(newValue, forKey: Self.prefixKey) }
     }
 
+    /// Whether the last kit export renamed its files; off by default - the
+    /// files keep their pads' names (the author's call, 2026-10-03).
+    var kitExportRenames: Bool {
+        get { UserDefaults.standard.bool(forKey: Self.renameKey) }
+        set { UserDefaults.standard.set(newValue, forKey: Self.renameKey) }
+    }
+
     private static let prefixKey = "kitExportPrefix"
+    private static let renameKey = "kitExportRename"
 
     var canExportKit: Bool { pads.contains(where: \.hasSynth) && !exporting }
 
-    /// Every pad with a drum as "<prefix> <pad number>", in the format and
-    /// depth of the export boxes, into a folder chosen in one panel that
-    /// also holds the prefix (see KitExport). Files already there with
-    /// those names are replaced only after asking.
+    /// Every pad with a drum, under its own name or renamed "<prefix> <pad
+    /// number>", in the format and depth of the export boxes, into a folder
+    /// chosen in one panel that also holds the naming (see KitExport).
+    /// Files already there with those names are replaced only after asking.
     func exportKit() {
         guard canExportKit else { return }
         let format = exportFormat, quality = exportQuality
-        let items = pads.filter(\.hasSynth).map { KitExport.Item(index: $0.index, params: $0.params, sampleRate: $0.exportRate) }
+        let items = pads.filter(\.hasSynth).map {
+            KitExport.Item(index: $0.index, params: $0.params, sampleRate: $0.exportRate, name: $0.name)
+        }
 
         let panel = NSOpenPanel()
         panel.title = "Export Kit"
-        panel.message = "Choose a folder: each pad with a drum becomes \"<prefix> <pad number>.\(format.fileExtension)\" (\(format.menuTitle) · \(quality.label))."
+        panel.message = "Choose a folder: each pad with a drum becomes a file named after its sample (\(format.menuTitle) · \(quality.label))."
         panel.prompt = "Export"
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.canCreateDirectories = true
         panel.allowsMultipleSelection = false
+        let rename = NSButton(checkboxWithTitle: "Rename as \"<prefix> <pad number>\"", target: nil, action: nil)
+        rename.state = kitExportRenames ? .on : .off
         let field = NSTextField(string: kitExportPrefix)
         field.placeholderString = KitExport.defaultPrefix
         let label = NSTextField(labelWithString: "Prefix:")
         let example = NSTextField(labelWithString: "")
         example.textColor = .secondaryLabelColor
         example.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
-        let preview = PrefixPreview(field: field, example: example, first: items.first?.index ?? 0,
-                                    count: items.count, fileExtension: format.fileExtension)
+        let preview = KitNamePreview(rename: rename, field: field, example: example, items: items,
+                                     fileExtension: format.fileExtension)
         field.delegate = preview
+        rename.target = preview
+        rename.action = #selector(KitNamePreview.renameToggled(_:))
         preview.update()
         let row = NSStackView(views: [label, field])
         row.orientation = .horizontal
         row.spacing = 8
         field.widthAnchor.constraint(equalToConstant: 280).isActive = true
-        let stack = NSStackView(views: [row, example])
+        let stack = NSStackView(views: [rename, row, example])
         stack.orientation = .vertical
         stack.alignment = .leading
-        stack.spacing = 4
+        stack.spacing = 6
         stack.edgeInsets = NSEdgeInsets(top: 10, left: 20, bottom: 10, right: 20)
         panel.accessoryView = stack
         panel.isAccessoryViewDisclosed = true
         guard panel.runModal() == .OK, let folder = panel.url else { return }
-        let prefix = KitExport.cleanPrefix(field.stringValue)
-        kitExportPrefix = prefix
+        kitExportRenames = rename.state == .on
+        let naming = preview.naming
+        if case .numbered(let prefix) = naming { kitExportPrefix = prefix }
 
-        let urls = KitExport.urls(for: items, prefix: prefix, format: format, in: folder)
-        let existing = urls.filter { FileManager.default.fileExists(atPath: $0.path) }
-        if !existing.isEmpty {
-            let alert = NSAlert()
-            alert.messageText = existing.count == 1 ? "Replace \(existing[0].lastPathComponent)?"
-                                                    : "Replace \(existing.count) files in \(folder.lastPathComponent)?"
-            alert.informativeText = existing.map(\.lastPathComponent).joined(separator: "\n")
-            alert.addButton(withTitle: "Replace")
-            alert.addButton(withTitle: "Cancel")
-            alert.alertStyle = .warning
-            guard alert.runModal() == .alertFirstButtonReturn else { return }
-        }
+        let urls = KitExport.urls(for: items, naming: naming, format: format, in: folder)
+        guard confirmReplacing(urls, in: folder) else { return }
 
         exporting = true
         message = "Exporting kit…"
         Task.detached(priority: .userInitiated) { [weak self] in
             let text: String
             do {
-                let written = try KitExport.export(items, prefix: prefix, format: format, quality: quality, to: folder)
-                text = "Exported \(written.count) file\(written.count == 1 ? "" : "s") \"\(prefix) …\" to \(folder.lastPathComponent) · \(quality.label)"
+                let written = try KitExport.export(items, naming: naming, format: format, quality: quality, to: folder)
+                let what = switch naming {
+                case .numbered(let prefix): " \"\(prefix) …\""
+                case .original: ""
+                }
+                text = "Exported \(written.count) file\(written.count == 1 ? "" : "s")\(what) to \(folder.lastPathComponent) · \(quality.label)"
             } catch {
                 text = error.localizedDescription
             }
             await self?.exported(text)
         }
     }
+
+    /// Asks before files already at `urls` are replaced; true to go on.
+    private func confirmReplacing(_ urls: [URL], in folder: URL) -> Bool {
+        let existing = urls.filter { FileManager.default.fileExists(atPath: $0.path) }
+        guard !existing.isEmpty else { return true }
+        let alert = NSAlert()
+        alert.messageText = existing.count == 1 ? "Replace \(existing[0].lastPathComponent)?"
+                                                : "Replace \(existing.count) files in \(folder.lastPathComponent)?"
+        alert.informativeText = existing.prefix(20).map(\.lastPathComponent).joined(separator: "\n")
+            + (existing.count > 20 ? "\n…" : "")
+        alert.addButton(withTitle: "Replace")
+        alert.addButton(withTitle: "Cancel")
+        alert.alertStyle = .warning
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
+    // MARK: - Export Kitbox Kit
+
+    /// The kit as one Kitbox preset (see KitboxKit): every pad's drum as a
+    /// sample, named after its pad, in the export boxes' format and depth,
+    /// with the pads' pan and notes. The panel opens where Kitbox keeps its
+    /// kits - /Library/Audio/Presets/Kitbox if it has been made, otherwise
+    /// Logic's settings folder for Kitbox - so Logic's menu lists it.
+    func exportKitboxKit() {
+        guard canExportKit else { return }
+        let format = exportFormat, quality = exportQuality
+        let kitPads = pads.map {
+            KitboxKit.Pad(index: $0.index, params: $0.hasSynth ? $0.params : nil, sampleRate: $0.exportRate,
+                          name: $0.name, pan: $0.pan, note: $0.note)
+        }
+        let panel = NSSavePanel()
+        panel.title = "Export Kitbox Kit"
+        panel.message = "A kit for Kitbox: every pad's drum as a sample (\(format.menuTitle) · \(quality.label)), with its pan and note."
+        panel.prompt = "Export"
+        panel.allowedContentTypes = [UTType(filenameExtension: KitboxKit.fileExtension) ?? .propertyList]
+        panel.nameFieldStringValue = "\(kitName ?? "Transmute Kit").\(KitboxKit.fileExtension)"
+        panel.canCreateDirectories = true
+        if let folder = Self.kitboxFolder() { panel.directoryURL = folder }
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        let name = url.deletingPathExtension().lastPathComponent
+
+        exporting = true
+        message = "Exporting Kitbox kit…"
+        Task.detached(priority: .userInitiated) { [weak self] in
+            let text: String
+            do {
+                let samples = try KitboxKit.export(kitPads, name: name, format: format, quality: quality, to: url)
+                text = "Saved \(url.lastPathComponent) for Kitbox · \(samples.count) pad\(samples.count == 1 ? "" : "s") · \(quality.label)"
+            } catch {
+                text = error.localizedDescription
+            }
+            await self?.exported(text)
+        }
+    }
+
+    /// Kitbox's own Save Kit folder, or Logic's settings folder for it -
+    /// in the real home, not the sandbox's container.
+    private static func kitboxFolder() -> URL? {
+        let system = URL(fileURLWithPath: "/Library/Audio/Presets/Kitbox", isDirectory: true)
+        if FileManager.default.fileExists(atPath: system.path) { return system }
+        guard let home = getpwuid(getuid())?.pointee.pw_dir else { return nil }
+        let logic = URL(fileURLWithPath: String(cString: home), isDirectory: true)
+            .appendingPathComponent("Music/Audio Music Apps/Plug-In Settings/Kitbox", isDirectory: true)
+        return FileManager.default.fileExists(atPath: logic.path) ? logic : nil
+    }
 }
 
-/// Shows under the prefix field what the first file will be called, as
-/// it is typed.
-private final class PrefixPreview: NSObject, NSTextFieldDelegate {
+/// Keeps the prefix field and the example under it in step with the
+/// Rename box: the field only counts when renaming, and the example shows
+/// what the first file will be called, as it is typed.
+private final class KitNamePreview: NSObject, NSTextFieldDelegate {
+    let rename: NSButton
     let field: NSTextField
     let example: NSTextField
-    let first: Int
-    let count: Int
+    let items: [KitExport.Item]
     let fileExtension: String
 
-    init(field: NSTextField, example: NSTextField, first: Int, count: Int, fileExtension: String) {
+    init(rename: NSButton, field: NSTextField, example: NSTextField, items: [KitExport.Item], fileExtension: String) {
+        self.rename = rename
         self.field = field
         self.example = example
-        self.first = first
-        self.count = count
+        self.items = items
         self.fileExtension = fileExtension
+    }
+
+    var naming: KitExport.Naming {
+        rename.state == .on ? .numbered(prefix: KitExport.cleanPrefix(field.stringValue)) : .original
     }
 
     func controlTextDidChange(_ obj: Notification) { update() }
 
+    @objc func renameToggled(_ sender: NSButton) { update() }
+
     func update() {
-        let name = KitExport.fileName(prefix: field.stringValue, index: first, fileExtension: fileExtension)
-        example.stringValue = count > 1 ? "\(name) … \(count) files" : name
+        field.isEnabled = rename.state == .on
+        let names = KitExport.fileNames(for: items, naming: naming, fileExtension: fileExtension)
+        guard let first = names.first else { example.stringValue = ""; return }
+        example.stringValue = names.count > 1 ? "\(first) … \(names.count) files" : first
     }
 }

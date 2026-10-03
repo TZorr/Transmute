@@ -61,7 +61,11 @@ Building it yourself works as well - see [Building](#building).
    pads 1-16 without asking - fewer leave the other pads as they are, more
    than sixteen are left out. Every other pad takes one file (of several,
    the first by name). **Clear** at the bottom (Drum › Clear All Pads)
-   empties all sixteen pads; their pan, notes and model choice stay. WAV, AIFF, CAF, FLAC, ALAC, AAC/M4A and MP3
+   empties all sixteen pads; their pan, notes and model choice stay.
+   **Reset All** (Drum › Reset All…) goes back to Transmute as it opens -
+   pads empty, pan, notes and models at their defaults, pad 1 selected,
+   the batch list empty - after asking; Settings, the export boxes and
+   learnt CCs stay, as over a restart. WAV, AIFF, CAF, FLAC, ALAC, AAC/M4A and MP3
    all work, up to 10 seconds. Stereo is folded to mono by averaging.
    Silence or noise before the hit is trimmed off.
 2. **Analysis and fit start on their own.** The measured first guess is
@@ -109,29 +113,44 @@ Building it yourself works as well - see [Building](#building).
    note - but no samples, so a pad from a kit has no original and no Match
    until a sample is dropped on it again.
 9. **Export Kit** (⌥⌘E, or the button beside Export) writes every pad
-   that holds a drum into one folder, as `<prefix> <pad number>` - prefix
-   *TR-707 Transmute* gives `TR-707 Transmute 1.wav` … `TR-707 Transmute
-   8.wav`. The prefix is typed in the folder panel (remembered, with the
-   first file name shown as you type); format and depth are the export
-   boxes'. Each file is its pad as Export would write it: mono, at its
-   sample's rate. Empty pads are skipped - the numbers stay the pads' -
-   and files already there are replaced only after asking.
-   `/` and `:` in the prefix become `-`.
+   that holds a drum into one folder, each file under its pad's own name -
+   the sample's (`BD Acoustic Round Indie 01.wav`) or the parameter
+   file's; two pads with one name give `Kick.wav` and `Kick 2.wav`.
+   **Rename** in the folder panel (remembered, off by default) names them
+   `<prefix> <pad number>` instead - prefix *TR-707 Transmute* gives
+   `TR-707 Transmute 1.wav` … `TR-707 Transmute 8.wav`; the first file
+   name is shown as you type. Format and depth are the export boxes'. Each
+   file is its pad as Export would write it: mono, at its sample's rate.
+   Empty pads are skipped - renamed, the numbers stay the pads' - and
+   files already there are replaced only after asking. `/` and `:` in a
+   name become `-`.
+   **Export Kitbox Kit…** (⇧⌥⌘E, or the arrow on Export Kit…) writes the
+   kit as one `.aupreset` for [Kitbox](../../Kitbox), the 16-pad sampler:
+   every drum as a sample on its own pad (named as above, in the export
+   boxes' format and depth), with the pads' pan and notes; every other
+   Kitbox knob at its default, Level 0 dB and Decay Full, so the file
+   plays as rendered. The panel opens in Kitbox's kit folder
+   (`/Library/Audio/Presets/Kitbox` if made, else Logic's Plug-In Settings
+   folder for Kitbox), so Kitbox's Load Kit and Logic's settings menu find
+   it.
 10. **Max level.** Settings › Level holds a ceiling for peaks, typed or
     stepped in 0.5 dB (-12 to 0 dBFS, default -1.5). **Limit to -1.5 dBFS**
     at the bottom (Drum › Limit Peaks, ⌥⌘L) lowers *Level* on every pad
     whose peak is above it by exactly the overshoot - the synth's gain is
     its last multiply, so the peak moves dB for dB - and leaves the others
     alone; it never raises one. The peak is taken at both the window's rate
-    and the export rate, whichever is higher. Pads still fitting are left
-    out (the fit would overwrite it); Reset goes back to the unlimited fit.
+    and the export rate, whichever is higher. Pads still loading or fitting
+    are limited as soon as their fit is done, so one click reaches all
+    sixteen; Reset goes back to the unlimited fit.
     No message lists the pads it lowered - the Peak readout shows where
     the selected pad now is.
 11. **Batch Convert** (File › Batch Convert…, ⇧⌘B, or the button left of
     Export Kit…) is a separate window:
     drop audio files or folders on it (subfolders included), or use Add
     Files…. The list is sorted by name and numbered; each file is decoded,
-    analysed, fitted and written as `<prefix> <number>`. **Convert** asks
+    analysed, fitted and written under its own name (`808 CLAP.wav`; the
+    same name from two folders gets ` 2`), or with **Rename** on as
+    `<prefix> <number>`. **Convert** asks
     for the folder - New Folder is in the panel, which opens where the
     last batch went. **Model** applies to every file:
     Automatic lets each sample's analysis choose, *Clap* analyses and fits

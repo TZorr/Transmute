@@ -94,6 +94,11 @@ final class PadModel {
     /// it.
     var modelChoice: DrumModel?
 
+    /// Limit was pressed while this pad was still fitting: its peak is
+    /// held to the max level as soon as the fit is done (AppModel
+    /// .limitPeaks). A new sample, a cleared pad or a failed fit drops it.
+    @ObservationIgnored var limitPending = false
+
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var task: Task<Void, Never>?
     @ObservationIgnored private var comparison: Comparison?
@@ -127,6 +132,7 @@ final class PadModel {
         generation += 1
         let mine = generation
         task?.cancel()
+        limitPending = false
         self.url = url
         sourceInfo = nil
         source = nil
@@ -174,6 +180,7 @@ final class PadModel {
 
     private func failed(_ message: String, generation: Int) {
         guard generation == self.generation else { return }
+        limitPending = false
         stage = .failed(message)
         app?.message = "Pad \(index + 1): \(message)"
     }
@@ -227,6 +234,7 @@ final class PadModel {
     func clear() {
         generation += 1
         task?.cancel()
+        limitPending = false
         url = nil
         sourceInfo = nil
         source = nil
@@ -279,6 +287,10 @@ final class PadModel {
         params = report.params
         renderSynth()
         stage = .done
+        if limitPending {
+            limitPending = false
+            app?.limit(self)
+        }
     }
 
     var canFit: Bool { analysis != nil && !stage.busy }
@@ -359,6 +371,7 @@ final class PadModel {
     func apply(_ setup: PadSetup) {
         generation += 1
         task?.cancel()
+        limitPending = false
         url = nil
         sourceInfo = nil
         source = nil

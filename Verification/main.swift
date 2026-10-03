@@ -30,9 +30,13 @@
 //  - the decoder folds stereo to mono by averaging, resamples, and refuses
 //    a file too long to be one hit,
 //  - a .drumparams file round-trips, opens with keys missing, and clamps,
-//  - Export Kit names its files "<prefix> <pad number>" with the prefix
-//    cleaned for the file system, skips nothing it was given, and every
-//    file reads back at its pad's rate,
+//  - Export Kit names its files after their pads by default (repeats
+//    numbered) or "<prefix> <pad number>" with the prefix cleaned for the
+//    file system, skips nothing it was given, and every file reads back at
+//    its pad's rate; Batch Convert names by the same rules,
+//  - a Kitbox kit is a preset Kitbox accepts: its plugin codes, a .kitbox
+//    container whose zlib stream checks out, every Kitbox parameter, the
+//    pads' pan and notes, and each drum's file byte for byte,
 //  - the player starts every hit from its first sample and fades instead
 //    of clicking when retriggered (its render block, driven by hand - no
 //    audio device, no sound),
@@ -1052,10 +1056,28 @@ do {
                  KitExport.Item(index: 7, params: hatParams(), sampleRate: 44_100)]
     let format = OutputFormat.wav
     let quality = format.qualityOptions.first { $0.label.contains("24") } ?? format.defaultQuality
-    let written = try KitExport.export(items, prefix: "TR-707 Transmute", format: format, quality: quality, to: folder)
+    let written = try KitExport.export(items, naming: .numbered(prefix: "TR-707 Transmute"), format: format,
+                                       quality: quality, to: folder)
     let names = written.map(\.lastPathComponent)
     check(names == ["TR-707 Transmute 1.wav", "TR-707 Transmute 3.wav", "TR-707 Transmute 8.wav"],
-          "three pads, three files: " + names.joined(separator: ", "))
+          "renamed: three pads, three files: " + names.joined(separator: ", "))
+
+    // By default the pads' own names: a repeat numbered (also against case),
+    // never onto a name already there; "/" and a leading dot cleaned; no
+    // name at all is the pad's.
+    let named = [KitExport.Item(index: 0, params: short, sampleRate: 44_100, name: " 808 CLAP"),
+                 KitExport.Item(index: 1, params: short, sampleRate: 44_100, name: "Kick"),
+                 KitExport.Item(index: 2, params: short, sampleRate: 44_100, name: "kick"),
+                 KitExport.Item(index: 3, params: short, sampleRate: 44_100, name: "Kick 2"),
+                 KitExport.Item(index: 4, params: short, sampleRate: 44_100, name: ".a/b"),
+                 KitExport.Item(index: 5, params: short, sampleRate: 44_100, name: "")]
+    let originals = KitExport.fileNames(for: named, naming: .original, fileExtension: "wav")
+    check(originals == [" 808 CLAP.wav", "Kick.wav", "kick 3.wav", "Kick 2.wav", "a-b.wav", "Pad 6.wav"],
+          "original names kept, repeats numbered: " + originals.joined(separator: ", "))
+    let kept = try KitExport.export(Array(named.prefix(2)), naming: .original, format: format, quality: quality, to: folder)
+    check(kept.map(\.lastPathComponent) == [" 808 CLAP.wav", "Kick.wav"]
+          && kept.allSatisfy { FileManager.default.fileExists(atPath: $0.path) },
+          "and written under them")
     var sound = true
     for (item, url) in zip(items, written) {
         let (samples, fileFormat) = try readBack(url)
@@ -1065,6 +1087,85 @@ do {
     check(sound, "each reads back mono, at its pad's rate, as long as the drum")
 } catch {
     check(false, "export kit: \(error)")
+}
+
+// MARK: - Kitbox kit
+
+section("Kitbox kit")
+do {
+    // The tree's binary form, checked against bytes worked out by hand from
+    // JUCE's ValueTree::writeToStream and var::writeToStream.
+    var tiny = ValueTree("T", [("i", .int(-2)), ("s", .string("ab")), ("b", .binary(Data([7])))])
+    tiny.children.append(ValueTree("C"))
+    let expected: [UInt8] = [0x54, 0, 1, 3,
+                             0x69, 0, 1, 5, 1, 0xFE, 0xFF, 0xFF, 0xFF,
+                             0x73, 0, 1, 4, 5, 0x61, 0x62, 0,
+                             0x62, 0, 1, 2, 8, 7,
+                             1, 1, 0x43, 0, 0, 0]
+    check([UInt8](tiny.encoded()) == expected, "a ValueTree is written byte for byte as JUCE writes it")
+    var big = Data()
+    ValueTree.writeCompressedInt(300, to: &big)
+    ValueTree.writeCompressedInt(-1, to: &big)
+    ValueTree.writeCompressedInt(0, to: &big)
+    check([UInt8](big) == [2, 0x2C, 0x01, 0x81, 0x01, 0], "compressed ints: 300, -1 and 0")
+    check(Zlib.adler32(Data("Wikipedia".utf8)) == 0x11E6_0398, "Adler-32 of \"Wikipedia\" is 0x11E60398")
+    let payload = Data((0..<100_000).map { UInt8(truncatingIfNeeded: $0 * 7 &+ $0 / 13) })
+    let zipped = Zlib.compress(payload)
+    check(zipped.prefix(2) == Data([0x78, 0x9C]) && Zlib.decompress(zipped) == payload && zipped.count < payload.count,
+          "zlib: header, deflate, checksum - and back")
+
+    var short = kickParams()
+    short.length = 0.3
+    let pads = (0..<16).map { i in
+        KitboxKit.Pad(index: i, params: i == 0 ? short : i == 2 ? snareParams() : i == 7 ? hatParams() : nil,
+                      sampleRate: i == 2 ? 48_000 : 44_100, name: i == 0 ? "Kick" : i == 2 ? "Kick" : "Hat",
+                      pan: i == 2 ? -50 : i == 7 ? 100 : 0, note: i == 7 ? 60 : i == 9 ? nil : UInt8(36 + i))
+    }
+    let wav = OutputFormat.wav
+    let depth24 = wav.qualityOptions.first { $0.label.contains("24") } ?? wav.defaultQuality
+    let presetURL = scratch.appendingPathComponent("Transmute Kit.aupreset")
+    let sampleNames = try KitboxKit.export(pads, name: "Transmute Kit", format: wav, quality: depth24, to: presetURL)
+    check(sampleNames == ["Kick.wav", "Kick 2.wav", "Hat.wav"], "three drums, named after their pads: " + sampleNames.joined(separator: ", "))
+
+    let plist = try PropertyListSerialization.propertyList(from: Data(contentsOf: presetURL), format: nil) as? [String: Any]
+    check(plist?["type"] as? Int == 0x6175_6D75 && plist?["subtype"] as? Int == 1_265_918_584
+          && plist?["manufacturer"] as? Int == 1_417_310_066 && plist?["version"] as? Int == 0
+          && plist?["name"] as? String == "Transmute Kit",
+          "a property list for aumu / Ktbx / Tzor, version 0, named after the file")
+    let state = plist?["jucePluginState"] as? Data ?? Data()
+    check(state.prefix(4) == Data("KTBX".utf8) && state.dropFirst(4).prefix(4) == Data([1, 0, 0, 0]),
+          "its state starts \"KTBX\", format 1")
+    let tree = Zlib.decompress(state.dropFirst(8)).flatMap(ValueTree.decode)
+    check(tree?.type == "KITBOX_FILE" && tree?.children.map(\.type) == ["KITBOX", "SAMPLES"],
+          "a KITBOX_FILE holding the settings and the samples")
+    let params = tree?.children.first
+    var values: [String: Double] = [:]
+    for child in params?.children ?? [] {
+        if case .string(let id) = child.property("id"), case .double(let v) = child.property("value") { values[id] = v }
+    }
+    check(params?.property("kitName") == .string("Transmute Kit") && params?.property("stateVersion") == .int(1)
+          && values.count == 14 + 16 * 22,
+          "every Kitbox parameter is there: \(values.count) of \(14 + 16 * 22)")
+    check(values["pad03_pan"] == -0.5 && values["pad08_pan"] == 1 && values["pad08_note"] == 60
+          && values["pad10_note"] == 45 && values["pad16_note"] == 51 && values["pad01_level"] == 0
+          && values["pad01_decay"] == 10_000 && values["humanize"] == 100,
+          "pan and notes carried over (a learnt-away note back at its default), the rest at Kitbox's defaults")
+    let stored = tree?.children.last?.children ?? []
+    var sameBytes = true
+    for (entry, (pad, name)) in zip(stored, [(0, "Kick.wav"), (2, "Kick 2.wav"), (7, "Hat.wav")]) {
+        guard entry.property("pad") == .int(Int32(pad)), entry.property("file") == .string(name),
+              case .binary(let bytes) = entry.property("data") else { sameBytes = false; continue }
+        let file = scratch.appendingPathComponent("kitbox-\(pad).wav")
+        try bytes.write(to: file)
+        let (samples, fileFormat) = try readBack(file)
+        let p = pads[pad]
+        sameBytes = sameBytes && fileFormat.sampleRate == p.sampleRate && fileFormat.channelCount == 1
+            && samples.count == Int((p.params!.renderLength * p.sampleRate).rounded())
+    }
+    check(stored.count == 3 && sameBytes, "each drum stored on its pad as a mono file at its rate, as long as the drum")
+    print("    preset left at \(presetURL.path)")
+} catch {
+    check(false, "kitbox kit: \(error)")
 }
 
 // MARK: - Max level
@@ -1129,6 +1230,13 @@ do {
     check(BatchConvert.fileName(prefix: "Clap", position: 0, fileExtension: "wav") == "Clap 1.wav"
           && BatchConvert.fileName(prefix: " ", position: 11, fileExtension: "aiff") == "Kit 12.aiff",
           "names are Export Kit's: \"Clap 1.wav\"; an empty prefix is \"Kit\"")
+    let sameName = [input.appendingPathComponent("hit 2.wav"), input.appendingPathComponent("sub/hit 2.aif"),
+                    input.appendingPathComponent("hit 10.wav")]
+    let batchOriginal = BatchConvert.fileNames(for: sameName, naming: .original, fileExtension: "aiff")
+    let batchRenamed = BatchConvert.fileNames(for: sameName, naming: .numbered(prefix: "Clap"), fileExtension: "wav")
+    check(batchOriginal == ["hit 2.aiff", "hit 2 2.aiff", "hit 10.aiff"] && batchRenamed == ["Clap 1.wav", "Clap 2.wav", "Clap 3.wav"],
+          "by default each file keeps its name (the same name twice: \" 2\"); renamed, the list's numbers: "
+          + batchOriginal.joined(separator: ", "))
 
     // The loud clap, as a clap, held to -1.5 dBFS: a 44.1 kHz mono file at
     // the ceiling.
