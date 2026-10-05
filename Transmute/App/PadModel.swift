@@ -31,6 +31,10 @@
 //  one is still being fitted bumps it, and whatever arrives with an older
 //  number is thrown away.
 //
+//  A pad shows its sample's name, or its parameter file's, unless it has
+//  been renamed (`rename`); that name is what a saved kit and an export
+//  carry too.
+//
 //  A pad can change places: dragging one pad onto another swaps the two
 //  objects in AppModel.pads (`moved(to:)` gives each its new index). Every
 //  job holds its pad, not a number, so a fit that ends after the move lands
@@ -80,6 +84,10 @@ final class PadModel {
     private(set) var score: MatchScore?
     /// Where the parameters came from, when they came from a file or a kit.
     private(set) var paramsName: String?
+    /// A name given by Rename; shown, saved and exported instead of the
+    /// others. Kept when the model changes, dropped with the drum: a new
+    /// sample, a parameter file, a kit or Clear.
+    private(set) var customName: String?
 
     var params = DrumParams() {
         didSet {
@@ -123,8 +131,17 @@ final class PadModel {
     var isEmpty: Bool { synth == nil && !stage.busy }
 
     /// What the pad shows.
-    var name: String {
+    var name: String { customName ?? originalName }
+
+    /// The name the pad had before any Rename.
+    var originalName: String {
         paramsName ?? url?.deletingPathExtension().lastPathComponent ?? ""
+    }
+
+    /// An empty name, or the original one, goes back to the original.
+    func rename(_ newName: String) {
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        customName = trimmed.isEmpty || trimmed == originalName ? nil : trimmed
     }
 
     // MARK: - Loading
@@ -150,6 +167,7 @@ final class PadModel {
         fitted = nil
         score = nil
         paramsName = nil
+        customName = nil
         if app?.selected == index { app?.player.setOriginal(nil) }
         stage = .decoding
         let choice = modelChoice
@@ -252,6 +270,7 @@ final class PadModel {
         fitted = nil
         score = nil
         paramsName = nil
+        customName = nil
         synth = nil
         params = DrumParams()
         synth = nil
@@ -381,6 +400,7 @@ final class PadModel {
             }
             params = loaded
             paramsName = url.deletingPathExtension().lastPathComponent
+            customName = nil
             renderSynth()
             app?.message = "Opened \(url.lastPathComponent) on pad \(index + 1)"
         } catch {
@@ -403,6 +423,7 @@ final class PadModel {
         pan = setup.pan
         note = setup.note
         modelChoice = setup.model
+        customName = nil
         if let loaded = setup.params {
             paramsName = setup.name.isEmpty ? "Pad \(index + 1)" : setup.name
             stage = .done

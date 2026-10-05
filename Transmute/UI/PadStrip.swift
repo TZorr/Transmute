@@ -10,7 +10,7 @@
 //
 //  A pad shows its drum's name, where its analysis and fit are, and the
 //  MIDI note it answers to; it lights while it sounds. Right-click for
-//  Load Sample…, Open Parameters…, Learn Note and Clear.
+//  Load Sample…, Open Parameters…, Rename…, Learn Note and Clear.
 //
 //  Dragging a pad onto another swaps them (AppModel.swapPads). The drag is
 //  the app's own gesture, not the system's drag and drop: files dropped
@@ -165,6 +165,8 @@ private struct PadView: View {
                 model.selected = pad.index
                 model.openParams()
             }
+            Button("Rename…") { model.renamePad(pad.index) }
+                .disabled(pad.isEmpty)
             Divider()
             Button(isLearning ? "Cancel Learn" : "Learn Note") { model.toggleLearn(.note(pad: pad.index)) }
             Divider()
@@ -175,8 +177,8 @@ private struct PadView: View {
         .accessibilityLabel("Pad \(pad.index + 1): \(pad.name.isEmpty ? "empty" : pad.name)")
         .accessibilityAddTraits(.isButton)
         .help(pad.index == 0
-              ? "Click to select and play - higher on the pad is harder. Drop up to sixteen samples here: sorted by name, they replace pads 1-16 without asking; more than sixteen are left out. Drag onto another pad to swap them (the MIDI notes stay). Right-click to learn a MIDI note."
-              : "Click to select and play - higher on the pad is harder. Drop a sample here (of several, the first by name). Drag onto another pad to swap them (the MIDI notes stay). Right-click to learn a MIDI note.")
+              ? "Click to select and play - higher on the pad is harder. Drop up to sixteen samples here: sorted by name, they replace pads 1-16 without asking; more than sixteen are left out. Drag onto another pad to swap them (the MIDI notes stay). Right-click to rename it or learn a MIDI note."
+              : "Click to select and play - higher on the pad is harder. Drop a sample here (of several, the first by name). Drag onto another pad to swap them (the MIDI notes stay). Right-click to rename it or learn a MIDI note.")
     }
 
     private var fill: Color {

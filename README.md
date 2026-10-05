@@ -168,6 +168,10 @@ Building it yourself works as well - see [Building](#building).
 
 ## Playing
 
+- **Rename** a pad by right-click › Rename…: the name shows on the pad,
+  is saved in the `.drumkit` and names the pad's file in exports and in a
+  Kitbox kit. An empty name goes back to the sample's own; a new sample,
+  a parameter file or Clear drops it, a model change keeps it.
 - **Filter** per pad: Off, Low-Pass or High-Pass (24 dB/oct) or Band-Pass,
   with Cutoff and Q. It is part of the drum (exports include it); the fit
   leaves it where it is but fits the drum through it.

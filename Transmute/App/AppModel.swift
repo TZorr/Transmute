@@ -251,6 +251,26 @@ final class AppModel {
         if panel.runModal() == .OK { drop(panel.urls, on: target) }
     }
 
+    /// Asks for a new name for a pad's drum. An empty name goes back to the
+    /// sample's own.
+    func renamePad(_ index: Int) {
+        guard pads.indices.contains(index), !pads[index].isEmpty else { return }
+        let pad = pads[index]
+        let alert = NSAlert()
+        alert.messageText = "Rename Pad \(index + 1)"
+        alert.informativeText = "Leave it empty to go back to \"\(pad.originalName)\"."
+        let field = NSTextField(string: pad.name)
+        field.placeholderString = pad.originalName
+        field.frame = NSRect(x: 0, y: 0, width: 280, height: 24)
+        alert.accessoryView = field
+        alert.addButton(withTitle: "Rename")
+        alert.addButton(withTitle: "Cancel")
+        alert.window.initialFirstResponder = field
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        pad.rename(field.stringValue)
+        message = "Renamed pad \(index + 1) to \"\(pad.name)\""
+    }
+
     /// Runs `job` as soon as fewer than `maxParallelFits` are running, in
     /// the order they came.
     func enqueueFit(_ job: @escaping @MainActor () async -> Void) {
