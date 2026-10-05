@@ -15,6 +15,11 @@ right-click. A `.drumkit` file keeps all sixteen. Five models: **Kick /
 Tom**, **Snare**, **Hi-Hat**, **Modal** and **Clap**, suggested by the
 analysis or chosen per pad - before a sample is dropped, too.
 
+The whole kit goes to [Kitbox](https://github.com/TZorr/Kitbox), its
+sibling 16-pad drum sampler (AU and VST3), in one step: **Export Kitbox
+Kit…** writes every drum onto its own pad, with pan and notes. Kitbox's
+demo kit was made this way.
+
 Native Swift. No SuperCollider, no Python, nothing to install: decoding and
 export are Core Audio, the analysis is Accelerate/vDSP, the synth is a plain
 Swift function, and AVAudioEngine plays it.
@@ -130,7 +135,7 @@ Building it yourself works as well - see [Building](#building).
    files already there are replaced only after asking. `/` and `:` in a
    name become `-`.
    **Export Kitbox Kit…** (⇧⌥⌘E, or the arrow on Export Kit…) writes the
-   kit as one `.aupreset` for [Kitbox](../../Kitbox), the 16-pad sampler:
+   kit as one `.aupreset` for [Kitbox](https://github.com/TZorr/Kitbox), the 16-pad sampler:
    every drum as a sample on its own pad (named as above, in the export
    boxes' format and depth), with the pads' pan and notes; every other
    Kitbox knob at its default, Level 0 dB and Decay Full, so the file
