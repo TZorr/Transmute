@@ -39,7 +39,7 @@ read-write access to the files you pick.
 
 ## Install
 
-Download `Transmute-1.2.dmg` from
+Download `Transmute-1.3.dmg` from
 [Releases](https://github.com/TZorr/Transmute/releases), open it and drag
 Transmute onto Applications. Apple Silicon, macOS 26.5 or later.
 
