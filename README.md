@@ -18,7 +18,10 @@ analysis or chosen per pad - before a sample is dropped, too.
 The whole kit goes to [Kitbox](https://github.com/TZorr/Kitbox), its
 sibling 16-pad drum sampler (AU and VST3), in one step: **Export Kitbox
 Kit…** writes every drum onto its own pad, with pan and notes. Kitbox's
-demo kit was made this way.
+demo kit was made this way. Since
+[Kitbox 0.7.1](https://github.com/TZorr/Kitbox/releases/tag/v0.7.1),
+Transmute's engine is built into Kitbox as well: each pad plays its sample
+or Transmute's synth of it, switched with **SMP / SYN** on the pad.
 
 Native Swift. No SuperCollider, no Python, nothing to install: decoding and
 export are Core Audio, the analysis is Accelerate/vDSP, the synth is a plain
