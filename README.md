@@ -23,6 +23,8 @@ Transmute's engine is built into Kitbox as well: each pad plays its sample
 or Transmute's synth of it, switched with **SMP / SYN** on the pad. Kitbox's
 demo kit was made that way, with its **SYN** button.
 
+Family: [Kitbox](https://github.com/TZorr/Kitbox) (16-pad drum sampler), [Rackbox](https://github.com/TZorr/Rackbox) (four-slot multi-effect), [Rackbox Plus](https://github.com/TZorr/RackboxPlus) (the same rack, eight knobs per effect), [FMBox](https://github.com/TZorr/FMBox) (eight-sound FM drum synth), [Chordbox](https://github.com/TZorr/Chordbox) (16-pad chord generator).
+
 Native Swift. No SuperCollider, no Python, nothing to install: decoding and
 export are Core Audio, the analysis is Accelerate/vDSP, the synth is a plain
 Swift function, and AVAudioEngine plays it.
