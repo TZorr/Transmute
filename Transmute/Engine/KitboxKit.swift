@@ -3,16 +3,13 @@
 //  Transmute
 //
 //  The kit as a Kitbox kit - the author's request (2026-10-03): one
-//  `.aupreset` that Kitbox (the 16-pad sampler beside this project) opens
-//  with Load Kit, or Logic from its settings menu, with every pad's drum on
-//  the same pad.
+//  `.kitbox` that Kitbox (the 16-pad sampler beside this project) opens
+//  with Load Kit, with every pad's drum on the same pad.
 //
-//  The file is Kitbox's own (see Kitbox/Source/Engine/AuPreset.h and
-//  KitFile.h): a property list naming the plugin - aumu / Ktbx / Tzor,
-//  version 0 - with the plugin's state, base64, under "jucePluginState".
-//  That state is the .kitbox container: "KTBX", a little-endian format
-//  version (1), then a zlib stream of a JUCE ValueTree in JUCE's binary
-//  form:
+//  The file is Kitbox's own container (see Kitbox/Source/Engine/KitFile.h),
+//  in its version 1 form, which Kitbox still reads: "KTBX", a little-endian
+//  format version (1), then a zlib stream of a JUCE ValueTree in JUCE's
+//  binary form:
 //
 //      KITBOX_FILE
 //        KITBOX stateVersion=1 selectedPad=0 kitName="…"
@@ -39,7 +36,7 @@
 import Foundation
 
 nonisolated enum KitboxKit {
-    static let fileExtension = "aupreset"
+    static let fileExtension = "kitbox"
 
     /// One pad: its number (0-based), drum (nil: empty), rate, name, pan
     /// and note.
@@ -56,7 +53,7 @@ nonisolated enum KitboxKit {
     static let padCount = 16
     static let firstNote = 36
 
-    /// Renders every pad with a drum and writes the preset to `url`; the
+    /// Renders every pad with a drum and writes the kit to `url`; the
     /// sample file names, in pad order.
     @discardableResult
     static func export(_ pads: [Pad], name: String, format: OutputFormat, quality: QualityOption,
@@ -79,49 +76,8 @@ nonisolated enum KitboxKit {
             samples.append(Sample(pad: pad.index, fileName: fileName, bytes: try Data(contentsOf: file)))
         }
         let settings = Dictionary(pads.map { ($0.index, $0) }, uniquingKeysWith: { a, _ in a })
-        let text = preset(state: state(samples: samples, settings: settings, kitName: name), name: name)
-        try Data(text.utf8).write(to: url, options: .atomic)
+        try state(samples: samples, settings: settings, kitName: name).write(to: url, options: .atomic)
         return names
-    }
-
-    // MARK: - The preset
-
-    static let type = fourCC("aumu")
-    static let subtype = fourCC("Ktbx")
-    static let manufacturer = fourCC("Tzor")
-
-    static func fourCC(_ code: String) -> Int {
-        code.utf8.reduce(0) { $0 << 8 | Int($1) }
-    }
-
-    /// The property list, keys in the order Logic (and Kitbox) write them.
-    static func preset(state: Data, name: String) -> String {
-        """
-        <?xml version="1.0" encoding="UTF-8"?>
-        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-        <plist version="1.0">
-        <dict>
-          <key>jucePluginState</key>
-          <data>\(state.base64EncodedString())</data>
-          <key>manufacturer</key>
-          <integer>\(manufacturer)</integer>
-          <key>name</key>
-          <string>\(xmlEscaped(name))</string>
-          <key>subtype</key>
-          <integer>\(subtype)</integer>
-          <key>type</key>
-          <integer>\(type)</integer>
-          <key>version</key>
-          <integer>0</integer>
-        </dict>
-        </plist>
-
-        """
-    }
-
-    private static func xmlEscaped(_ s: String) -> String {
-        s.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;")
-            .replacingOccurrences(of: ">", with: "&gt;")
     }
 
     // MARK: - The .kitbox container

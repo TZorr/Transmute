@@ -583,11 +583,11 @@ final class AppModel {
 
     // MARK: - Export Kitbox Kit
 
-    /// The kit as one Kitbox preset (see KitboxKit): every pad's drum as a
+    /// The kit as one Kitbox kit file (see KitboxKit): every pad's drum as a
     /// sample, named after its pad, in the export boxes' format and depth,
     /// with the pads' pan and notes. The panel opens where Kitbox keeps its
     /// kits - /Library/Audio/Presets/Kitbox if it has been made, otherwise
-    /// Logic's settings folder for Kitbox - so Logic's menu lists it.
+    /// Logic's settings folder for Kitbox - so Load Kit starts there.
     func exportKitboxKit() {
         guard canExportKit else { return }
         let format = exportFormat, quality = exportQuality
@@ -599,7 +599,7 @@ final class AppModel {
         panel.title = "Export Kitbox Kit"
         panel.message = "A kit for Kitbox: every pad's drum as a sample (\(format.menuTitle) · \(quality.label)), with its pan and note."
         panel.prompt = "Export"
-        panel.allowedContentTypes = [UTType(filenameExtension: KitboxKit.fileExtension) ?? .propertyList]
+        panel.allowedContentTypes = [UTType(filenameExtension: KitboxKit.fileExtension) ?? .data]
         panel.nameFieldStringValue = "\(kitName ?? "Transmute Kit").\(KitboxKit.fileExtension)"
         panel.canCreateDirectories = true
         if let folder = Self.kitboxFolder() { panel.directoryURL = folder }

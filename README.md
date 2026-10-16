@@ -140,14 +140,13 @@ Building it yourself works as well - see [Building](#building).
    files already there are replaced only after asking. `/` and `:` in a
    name become `-`.
    **Export Kitbox Kit…** (⇧⌥⌘E, or the arrow on Export Kit…) writes the
-   kit as one `.aupreset` for [Kitbox](https://github.com/TZorr/Kitbox), the 16-pad sampler:
+   kit as one `.kitbox` for [Kitbox](https://github.com/TZorr/Kitbox), the 16-pad sampler:
    every drum as a sample on its own pad (named as above, in the export
    boxes' format and depth), with the pads' pan and notes; every other
    Kitbox knob at its default, Level 0 dB and Decay Full, so the file
    plays as rendered. The panel opens in Kitbox's kit folder
    (`/Library/Audio/Presets/Kitbox` if made, else Logic's Plug-In Settings
-   folder for Kitbox), so Kitbox's Load Kit and Logic's settings menu find
-   it.
+   folder for Kitbox), so Kitbox's Load Kit finds it.
 10. **Max level.** Settings › Level holds a ceiling for peaks, typed or
     stepped in 0.5 dB (-12 to 0 dBFS, default -1.5). **Limit to -1.5 dBFS**
     at the bottom (Drum › Limit Peaks, ⌥⌘L) lowers *Level* on every pad

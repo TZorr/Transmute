@@ -34,8 +34,8 @@
 //    numbered) or "<prefix> <pad number>" with the prefix cleaned for the
 //    file system, skips nothing it was given, and every file reads back at
 //    its pad's rate; Batch Convert names by the same rules,
-//  - a Kitbox kit is a preset Kitbox accepts: its plugin codes, a .kitbox
-//    container whose zlib stream checks out, every Kitbox parameter, the
+//  - a Kitbox kit is a .kitbox Kitbox accepts: a version 1 container
+//    whose zlib stream checks out, every Kitbox parameter, the
 //    pads' pan and notes, and each drum's file byte for byte,
 //  - the player starts every hit from its first sample and fades instead
 //    of clicking when retriggered (its render block, driven by hand - no
@@ -1123,18 +1123,13 @@ do {
     }
     let wav = OutputFormat.wav
     let depth24 = wav.qualityOptions.first { $0.label.contains("24") } ?? wav.defaultQuality
-    let presetURL = scratch.appendingPathComponent("Transmute Kit.aupreset")
+    let presetURL = scratch.appendingPathComponent("Transmute Kit.kitbox")
     let sampleNames = try KitboxKit.export(pads, name: "Transmute Kit", format: wav, quality: depth24, to: presetURL)
     check(sampleNames == ["Kick.wav", "Kick 2.wav", "Hat.wav"], "three drums, named after their pads: " + sampleNames.joined(separator: ", "))
 
-    let plist = try PropertyListSerialization.propertyList(from: Data(contentsOf: presetURL), format: nil) as? [String: Any]
-    check(plist?["type"] as? Int == 0x6175_6D75 && plist?["subtype"] as? Int == 1_265_918_584
-          && plist?["manufacturer"] as? Int == 1_417_310_066 && plist?["version"] as? Int == 0
-          && plist?["name"] as? String == "Transmute Kit",
-          "a property list for aumu / Ktbx / Tzor, version 0, named after the file")
-    let state = plist?["jucePluginState"] as? Data ?? Data()
+    let state = try Data(contentsOf: presetURL)
     check(state.prefix(4) == Data("KTBX".utf8) && state.dropFirst(4).prefix(4) == Data([1, 0, 0, 0]),
-          "its state starts \"KTBX\", format 1")
+          "the .kitbox starts \"KTBX\", format 1")
     let tree = Zlib.decompress(state.dropFirst(8)).flatMap(ValueTree.decode)
     check(tree?.type == "KITBOX_FILE" && tree?.children.map(\.type) == ["KITBOX", "SAMPLES"],
           "a KITBOX_FILE holding the settings and the samples")
@@ -1163,7 +1158,7 @@ do {
             && samples.count == Int((p.params!.renderLength * p.sampleRate).rounded())
     }
     check(stored.count == 3 && sameBytes, "each drum stored on its pad as a mono file at its rate, as long as the drum")
-    print("    preset left at \(presetURL.path)")
+    print("    kit left at \(presetURL.path)")
 } catch {
     check(false, "kitbox kit: \(error)")
 }
